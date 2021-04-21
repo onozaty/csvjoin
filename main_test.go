@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/csv"
 	"reflect"
 	"strings"
@@ -25,8 +27,8 @@ func TestLoadCsvTable(t *testing.T) {
 		t.Fatal("failed test\n", table.columnNames())
 	}
 
-	if table.primaryColumn() != "ID" {
-		t.Fatal("failed test\n", table.primaryColumn())
+	if table.joinColumnName() != "ID" {
+		t.Fatal("failed test\n", table.joinColumnName())
 	}
 
 	result := table.find("5")
@@ -44,6 +46,84 @@ func TestLoadCsvTable(t *testing.T) {
 	result = table.find("10")
 	if result != nil {
 
+		t.Fatal("failed test\n", result)
+	}
+}
+
+func TestJoin(t *testing.T) {
+
+	ls := `ID,Name
+1,Yamada
+5,Ichikawa
+2,"Hanako, Sato"
+`
+	lr := csv.NewReader(strings.NewReader(ls))
+
+	rs := `ID,Height,Weight
+1,171,50
+2,160,60
+5,152,50
+`
+	rr := csv.NewReader(strings.NewReader(rs))
+
+	var b bytes.Buffer
+	w := bufio.NewWriter(&b)
+	out := csv.NewWriter(w)
+
+	err := join(lr, rr, "ID", out)
+
+	if err != nil {
+		t.Fatal("failed test\n", err)
+	}
+
+	out.Flush()
+	result := string(b.Bytes())
+
+	expect := `ID,Name,Height,Weight
+1,Yamada,171,50
+5,Ichikawa,152,50
+2,"Hanako, Sato",160,60
+`
+
+	if result != expect {
+		t.Fatal("failed test\n", result)
+	}
+}
+
+func TestJoin_rightNone(t *testing.T) {
+
+	ls := `ID,Name
+1,Yamada
+5,Ichikawa
+2,"Hanako, Sato"
+`
+	lr := csv.NewReader(strings.NewReader(ls))
+
+	rs := `ID,Height,Weight
+5,152,50
+`
+	rr := csv.NewReader(strings.NewReader(rs))
+
+	var b bytes.Buffer
+	w := bufio.NewWriter(&b)
+	out := csv.NewWriter(w)
+
+	err := join(lr, rr, "ID", out)
+
+	if err != nil {
+		t.Fatal("failed test\n", err)
+	}
+
+	out.Flush()
+	result := string(b.Bytes())
+
+	expect := `ID,Name,Height,Weight
+1,Yamada,,
+5,Ichikawa,152,50
+2,"Hanako, Sato",,
+`
+
+	if result != expect {
 		t.Fatal("failed test\n", result)
 	}
 }
