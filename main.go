@@ -1,11 +1,16 @@
 package main
 
 import (
+	"bufio"
 	"encoding/csv"
 	"fmt"
 	"io"
+	"os"
+	"reflect"
 
 	"github.com/pkg/errors"
+
+	flag "github.com/spf13/pflag"
 )
 
 var (
@@ -26,6 +31,79 @@ type MemoryTable struct {
 }
 
 func main() {
+
+	if len(commit) > 7 {
+		commit = commit[:7]
+	}
+
+	var firstPath string
+	var secondPath string
+	var outputPath string
+	var joinColumnName string
+	var help bool
+
+	flag.StringVarP(&firstPath, "first", "1", "", "First CSV file path")
+	flag.StringVarP(&secondPath, "second", "2", "", "Second CSV file path")
+	flag.StringVarP(&joinColumnName, "column", "c", "", "Name of the column to use for the join")
+	flag.StringVarP(&outputPath, "output", "o", "", "Output CSV file path")
+	flag.BoolVarP(&help, "help", "h", false, "Help")
+	flag.Parse()
+	flag.CommandLine.SortFlags = false
+
+	if help {
+		fmt.Printf("csvjoin v%s (%s)\n", version, commit)
+		flag.Usage()
+		os.Exit(0)
+	}
+
+	if firstPath == "" || secondPath == "" || joinColumnName == "" || outputPath == "" {
+		fmt.Printf("csvjoin v%s (%s)\n", version, commit)
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	firstFile, err := os.Open(firstPath)
+	if err != nil {
+		fmt.Printf("\nFailed to open file. path:%s error:%v\n", firstPath, err)
+		os.Exit(1)
+	}
+	defer firstFile.Close()
+
+	firstReader, err := newCsvReader(firstFile)
+	if err != nil {
+		fmt.Printf("\nFailed to read file. path:%s error:%v\n", firstPath, err)
+		os.Exit(1)
+	}
+
+	secondFile, err := os.Open(secondPath)
+	if err != nil {
+		fmt.Printf("\nFailed to open file. path:%s error:%v\n", secondPath, err)
+		os.Exit(1)
+	}
+	defer secondFile.Close()
+
+	secondReader, err := newCsvReader(secondFile)
+	if err != nil {
+		fmt.Printf("\nFailed to read file. path:%s error:%v\n", secondPath, err)
+		os.Exit(1)
+	}
+
+	outputFile, err := os.Create(outputPath)
+	if err != nil {
+		fmt.Printf("\nFailed to create file. path:%s error:%v\n", outputPath, err)
+		os.Exit(1)
+	}
+	defer outputFile.Close()
+	out := csv.NewWriter(outputFile)
+
+	err = join(firstReader, secondReader, joinColumnName, out)
+
+	if err != nil {
+		fmt.Printf("\nError: %v\n", err)
+		os.Exit(1)
+	}
+
+	out.Flush()
 }
 
 func join(first *csv.Reader, second *csv.Reader, joinColumnName string, out *csv.Writer) error {
@@ -72,6 +150,24 @@ func join(first *csv.Reader, second *csv.Reader, joinColumnName string, out *csv
 	}
 
 	return nil
+}
+
+var utf8bom = []byte{0xEF, 0xBB, 0xBF}
+
+func newCsvReader(file *os.File) (*csv.Reader, error) {
+
+	br := bufio.NewReader(file)
+	mark, err := br.Peek(len(utf8bom))
+	if err != nil {
+		return nil, err
+	}
+
+	if reflect.DeepEqual(mark, utf8bom) {
+		// BOMがあれば読み飛ばす
+		br.Discard(len(utf8bom))
+	}
+
+	return csv.NewReader(br), nil
 }
 
 func (t *MemoryTable) find(key string) map[string]string {
