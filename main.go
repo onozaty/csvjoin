@@ -4,6 +4,8 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+
+	"github.com/pkg/errors"
 )
 
 var (
@@ -26,47 +28,47 @@ type MemoryTable struct {
 func main() {
 }
 
-func join(left *csv.Reader, right *csv.Reader, joinColumnName string, result *csv.Writer) error {
+func join(first *csv.Reader, second *csv.Reader, joinColumnName string, out *csv.Writer) error {
 
-	rightTable, err := loadCsvTable(right, joinColumnName)
+	secondTable, err := loadCsvTable(second, joinColumnName)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Failed to read the second CSV file")
 	}
 
-	leftColumnNames, err := left.Read()
+	firstColumnNames, err := first.Read()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Failed to read the first CSV file")
 	}
-	leftJoinColumnIndex := indexOf(leftColumnNames, joinColumnName)
-	if leftJoinColumnIndex == -1 {
+	firstJoinColumnIndex := indexOf(firstColumnNames, joinColumnName)
+	if firstJoinColumnIndex == -1 {
 		return fmt.Errorf("%s is not found", joinColumnName)
 	}
 
 	// 追加するものは、結合用のカラムを除く
-	appendRightColumnNames := remove(rightTable.columnNames(), joinColumnName)
-	resultColumnNames := append(leftColumnNames, appendRightColumnNames...)
-	result.Write(resultColumnNames)
+	appendsecondColumnNames := remove(secondTable.columnNames(), joinColumnName)
+	outColumnNames := append(firstColumnNames, appendsecondColumnNames...)
+	out.Write(outColumnNames)
 
-	// 基準となるCSVを読み込みながら、結合用のカラムの値をキーとして片方のCSVから値を取得
+	// 基準となるCSVを読み込みながら、結合用のカラムの値をキーとしてもう片方のCSVから値を取得
 	for {
-		leftRow, err := left.Read()
+		firstRow, err := first.Read()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return err
+			return errors.Wrap(err, "Failed to read the first CSV file")
 		}
 
-		rightRowMap := rightTable.find(leftRow[leftJoinColumnIndex])
-		rightRow := make([]string, len(appendRightColumnNames))
+		secondRowMap := secondTable.find(firstRow[firstJoinColumnIndex])
+		secondRow := make([]string, len(appendsecondColumnNames))
 
-		for i, appendColumnName := range appendRightColumnNames {
-			if rightRowMap != nil {
-				rightRow[i] = rightRowMap[appendColumnName]
+		for i, appendColumnName := range appendsecondColumnNames {
+			if secondRowMap != nil {
+				secondRow[i] = secondRowMap[appendColumnName]
 			}
 		}
 
-		result.Write(append(leftRow, rightRow...))
+		out.Write(append(firstRow, secondRow...))
 	}
 
 	return nil
@@ -120,6 +122,8 @@ func loadCsvTable(reader *csv.Reader, joinColumnName string) (CsvTable, error) {
 			return nil, err
 		}
 
+		// 格納前に既にあるか確認
+		// -> 重複して存在した場合はエラーに
 		_, has := rows[row[primaryColumnIndex]]
 		if has {
 			return nil, fmt.Errorf("%s is duplicated", row[primaryColumnIndex])

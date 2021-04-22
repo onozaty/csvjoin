@@ -52,25 +52,25 @@ func TestLoadCsvTable(t *testing.T) {
 
 func TestJoin(t *testing.T) {
 
-	ls := `ID,Name
+	s1 := `ID,Name
 1,Yamada
 5,Ichikawa
 2,"Hanako, Sato"
 `
-	lr := csv.NewReader(strings.NewReader(ls))
+	r1 := csv.NewReader(strings.NewReader(s1))
 
-	rs := `ID,Height,Weight
+	s2 := `ID,Height,Weight
 1,171,50
 2,160,60
 5,152,50
 `
-	rr := csv.NewReader(strings.NewReader(rs))
+	r2 := csv.NewReader(strings.NewReader(s2))
 
 	var b bytes.Buffer
 	w := bufio.NewWriter(&b)
 	out := csv.NewWriter(w)
 
-	err := join(lr, rr, "ID", out)
+	err := join(r1, r2, "ID", out)
 
 	if err != nil {
 		t.Fatal("failed test\n", err)
@@ -92,23 +92,23 @@ func TestJoin(t *testing.T) {
 
 func TestJoin_rightNone(t *testing.T) {
 
-	ls := `ID,Name
+	s1 := `ID,Name
 1,Yamada
 5,Ichikawa
 2,"Hanako, Sato"
 `
-	lr := csv.NewReader(strings.NewReader(ls))
+	r1 := csv.NewReader(strings.NewReader(s1))
 
-	rs := `ID,Height,Weight
+	s2 := `ID,Height,Weight
 5,152,50
 `
-	rr := csv.NewReader(strings.NewReader(rs))
+	r2 := csv.NewReader(strings.NewReader(s2))
 
 	var b bytes.Buffer
 	w := bufio.NewWriter(&b)
 	out := csv.NewWriter(w)
 
-	err := join(lr, rr, "ID", out)
+	err := join(r1, r2, "ID", out)
 
 	if err != nil {
 		t.Fatal("failed test\n", err)
