@@ -1,3 +1,8 @@
+
+It has been moved to the following project.
+
+* https://github.com/onozaty/csvt
+
 # csvjoin
 
 Join CSV
